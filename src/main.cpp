@@ -14,6 +14,8 @@ void togglePump()
 
 void setup()
 {
+
+  Serial.begin(115200); 
   pinMode(Pump, OUTPUT);
   pinMode(filtervalve, OUTPUT);
 
@@ -27,5 +29,5 @@ void setup()
 
 void loop()
 {
-
+Serial.println("hhhhh");
 }
