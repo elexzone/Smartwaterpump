@@ -242,7 +242,6 @@ String HourStatus()
     Serial.println("Failed to get local time!");
     status = "UNKNOWN";
   }
-  Serial.println("Hour Status: " + status);
   return status;
 }
 // Send a float to Firebase
@@ -357,114 +356,105 @@ void setup()
   digitalWrite(filtervalve, LOW);
 }
 
-void loop()
-{
-   
- // Read sensor values
-  float tds = TDSreading(temperature);
-  String tanklevel = tanklevel_check(Tankhight); // Check tank level
-  String Hours = HourStatus();  
-  
-  String readFirebase = readString("Waterpump/waterpump"); 
+void loop() {
+    // Read sensor values
+    float tds = TDSreading(temperature);
+    String tanklevel = tanklevel_check(Tankhight); // Check tank level
+    String Hours = HourStatus();  
+    String readFirebase = readString("Waterpump/waterpump"); 
+    Serial.println(String("APP Status for pump: ")+readFirebase);
 
-  // Log TDS value
-  if (tds >= 0)
-  { // Validate TDS value
-    Serial.print("TDS Value: ");
-
-    String formattedTDS = String(tds, 2); 
-    Serial.print(tds, 2); // Print TDS value to 2 decimal places
-    Serial.println(" ppm");
-    // Condition: Stop pump if TDS is critically low
-    if (tds > 0.00 && tds <= 8.00)
-    {
-      digitalWrite(Pump, LOW);
-      Serial.println("Water PUMP is OFF due to low TDS");
+    // Log TDS value
+    if (tds >= 0) { // Validate TDS value
+        Serial.print("TDS Value: ");
+        Serial.print(tds, 2); // Print TDS value to 2 decimal places
+        Serial.println(" ppm");
+        
+        // Condition: Stop pump if TDS is critically low
+        if (tds > 0.00 && tds <= 8.00) {
+            digitalWrite(Pump, LOW);
+            Serial.println("Water PUMP is OFF due to low TDS");
+        }
     }
-  }
- 
-   unsigned long currentMillis = millis();
 
-  // Send float data every 5 seconds
-  if (currentMillis - floatDataTimer >= interval) {
-    floatDataTimer = currentMillis;
-    send_Sensordata(tds, "Waterpump/Tds");
-  }
+    unsigned long currentMillis = millis();
 
-  // Send string data every 10 seconds
-  if (currentMillis - stringDataTimer >= interval * 2) { // 10 seconds interval
-    stringDataTimer = currentMillis;
-    send_Message(Hours, "Waterpump/Hourstatus");
-    send_Message(tanklevel, "Waterpump/Waterlevel");
-  }
+    // Send float data every 5 seconds
+    if (currentMillis - floatDataTimer >= interval) {
+        floatDataTimer = currentMillis;
+        send_Sensordata(tds, "Waterpump/Tds");
+    }
 
+    // Send string data every 10 seconds
+    if (currentMillis - stringDataTimer >= interval * 2) { 
+        stringDataTimer = currentMillis;
+        send_Message(Hours, "Waterpump/Hourstatus");
+        send_Message(tanklevel, "Waterpump/Waterlevel");
+        send_Message("false", "Waterpump/Pumpstatus");
+        send_Message("false", "Waterpump/waterpump");
+    }
 
-  if (touchDetected1) {
-    Serial.println("Manual Touch Detected: Pump Activated");
+    if (touchDetected1) {
+        Serial.println("______Manual Touch Detected: Pump is ON_______");
+        digitalWrite(Pump, HIGH);
+        
+        while (tanklevel_check(Tankhight) != "HIGH") {
+            Serial.println("Checking Tank Level...");
+            delay(1000); 
+        }
+        
+        Serial.println("Tank is FULL. Turning off Pump.");
+        digitalWrite(Pump, LOW);
+        Serial.println("Water PUMP is OFF | Tank level HIGH");
+        touchDetected1 = false;  // Reset flag
+    } 
+    else {
+        // Handle tank level conditions
+        if (tanklevel == "LOW") {
+            if ((Hours == "REGULAR" || Hours == "OFF-PEAK") && tds > 8.00 && tds <= 12.00) {
+                digitalWrite(Pump, HIGH);
+                digitalWrite(filtervalve, LOW);
+                Serial.println("Water PUMP is ON | (8-12 ppm)");
+            } 
+            else if ((Hours == "REGULAR" || Hours == "OFF-PEAK") && tds > 12.00) {
+                digitalWrite(Pump, LOW);
+                digitalWrite(filtervalve, HIGH);
+                Serial.println("Filter valve ON & Water PUMP OFF | (TDS > 12 ppm)");
+            } 
+            else if (readFirebase == "OFF") {
+                digitalWrite(Pump, LOW);
+                Serial.println("Water PUMP OFF | From APP");
+            } 
+            else if (readFirebase == "true") {
+                Serial.println("******Pump is ON From Mobile APP******");
+                digitalWrite(Pump, HIGH);
+                
+                while (tanklevel_check(Tankhight) != "HIGH") {
+                    Serial.println("Checking Tank Level...");
+                    delay(1000); 
+                }
+                
+                Serial.println("Tank is FULL. Turning off Pump.");
+                digitalWrite(Pump, LOW);
+                Serial.println("Water PUMP is OFF | Tank level HIGH");
 
-    digitalWrite(Pump, HIGH);
-    
-    while (true) {
-        String tanklevel = tanklevel_check(Tankhight); // Continuously update tank level
-        Serial.println("Checking Tank Level...");
+            } 
+            else {
+                digitalWrite(Pump, LOW);
+                digitalWrite(filtervalve, LOW);
+                Serial.println("Water PUMP & Filter valve OFF | (No condition met)");
+         
+        } 
 
-        if (tanklevel == "HIGH") {
-            Serial.println("Tank is FULL. Turning off Pump.");
-            break;  // Exit loop when tank is full
         }
 
-        delay(1000); 
-    }
+        else if (tanklevel == "HIGH") {
+            // Tank is full
+            digitalWrite(Pump, LOW);
+            digitalWrite(filtervalve, LOW);
+            Serial.println("Water PUMP & Filter valve OFF | (Tank level HIGH)");
 
-    digitalWrite(Pump, LOW);
-    Serial.println("Water PUMP is OFF | Tank level HIGH");
-    touchDetected1 = false;  // Reset flag
-}
-
-else{
-
-
-  // Handle tank level conditions
-  if (tanklevel == "LOW")
-  {
-   
-    if ((Hours == "REGULAR" || Hours == "OFF-PEAK") && tds > 8.00 && tds <= 12.00)
-    {
-      digitalWrite(Pump, HIGH);
-      digitalWrite(filtervalve, LOW);
-      Serial.println("Water PUMP is ON | (8-12 ppm)");
+        }
     }
-    else if ((Hours == "REGULAR" || Hours == "OFF-PEAK") && tds > 12.00)
-    {
-      digitalWrite(Pump, LOW);
-      digitalWrite(filtervalve, HIGH);
-      Serial.println("Filter valve ON & Water PUMP OFF | (TDS > 12 ppm)");
-    }
-    else if (readFirebase == "OFF")
-    {
-      digitalWrite(Pump, LOW);
-      Serial.println("Water PUMP OFF | From APP ");
-    }
-    else if (readFirebase == "ON")
-    {
-      digitalWrite(Pump, HIGH);
-      Serial.println("Water PUMP ON | From APP ");
-    }
-
-    else
-    {
-      digitalWrite(Pump, LOW);
-      digitalWrite(filtervalve, LOW);
-      Serial.println("Water PUMP & Filter valve OFF | (No condition met)");
-    }
-  }
-  else if (tanklevel == "HIGH")
-  {
-    // Tank is full
-    digitalWrite(Pump, LOW);
-    digitalWrite(filtervalve, LOW);
-    Serial.println("Water PUMP & Filter valve OFF | (Tank level HIGH)");
-  }
-}
- delay(2000); // 2-second delay to stabilize loop
+    delay(1000); 
 }
