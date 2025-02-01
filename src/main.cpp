@@ -27,7 +27,8 @@ unsigned long stringDataTimer = 0;
 const unsigned long interval = 5000; // 5 seconds between each type of data send
 
 bool signupOK = false;
-
+const byte BtnPin1 = 23; 
+volatile bool touchDetected1 = false;
 
 // WiFi credentials
 const char *ssid = "Ravishka_Msi";
@@ -66,7 +67,9 @@ struct tm peakEnd = {0, 30, 22};   // 10:30 PM
 
 struct tm offPeakStart = {0, 30, 22}; // 10:30 PM
 struct tm offPeakEnd = {0, 30, 5};    // 5:30 AM
-
+void touchISR1() {
+  touchDetected1 = true;
+}
 // Function to get local time as a String
 String LocalTime()
 {
@@ -200,7 +203,7 @@ String tanklevel_check(float tankhight)
   {
     level = "HIGH";
   }
-  Serial.println(String("Water level: ") + level);
+  // Serial.println(String("Water level: ") + level);
   return level;
 }
 
@@ -246,10 +249,10 @@ String HourStatus()
 void send_Sensordata(float floatdata, String floatpath) {
   if (Firebase.ready() && signupOK) {
     if (Firebase.RTDB.setFloat(&fbdo, floatpath, floatdata)) {
-      Serial.println("PASSED");
-      Serial.println(floatdata);
-      Serial.println("PATH: " + fbdo.dataPath());
-      Serial.println("TYPE: " + fbdo.dataType());
+      // Serial.println("PASSED");
+      // Serial.println(floatdata);
+      // Serial.println("PATH: " + fbdo.dataPath());
+      // Serial.println("TYPE: " + fbdo.dataType());
     } else {
       Serial.println("FAILED");
       Serial.println("REASON: " + fbdo.errorReason());
@@ -261,10 +264,10 @@ void send_Sensordata(float floatdata, String floatpath) {
 void send_Message(String message, String databasePath) {
   if (Firebase.ready() && signupOK) {
     if (Firebase.RTDB.setString(&fbdo, databasePath.c_str(), message)) {
-      Serial.println("PASSED");
-      Serial.println(message);
-      Serial.println("PATH: " + fbdo.dataPath());
-      Serial.println("TYPE: " + fbdo.dataType());
+      // Serial.println("PASSED");
+      // Serial.println(message);
+      // Serial.println("PATH: " + fbdo.dataPath());
+      // Serial.println("TYPE: " + fbdo.dataType());
     } else {
       Serial.println("FAILED");
       Serial.println("REASON: " + fbdo.errorReason());
@@ -278,9 +281,9 @@ String readString(String path) {
   if (Firebase.RTDB.getString(&fbdo, path)) {
     if (fbdo.dataType() == "string") {
       receivedString = fbdo.stringData();
-      Serial.println("Received string data: " + receivedString);
+     // Serial.println("Received string data: " + receivedString);
     } else {
-      Serial.println("Data is not a string!");
+     // Serial.println("Data is not a string!");
     }
   } else {
     Serial.println("Failed to read string data. Reason: " + fbdo.errorReason());
@@ -345,8 +348,9 @@ void setup()
   pinMode(Pump, OUTPUT);
   pinMode(filtervalve, OUTPUT);
 
-  pinMode(BUTTON_PIN, INPUT_PULLUP);                                       // Set button pin as input with internal pull-up
-  attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), togglePump, FALLING); // Attach interrupt on button press
+  pinMode(BtnPin1, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(BtnPin1), touchISR1, RISING);
+
 
   // Init
   digitalWrite(Pump, LOW);
@@ -355,7 +359,8 @@ void setup()
 
 void loop()
 {
-  // Read sensor values
+   
+ // Read sensor values
   float tds = TDSreading(temperature);
   String tanklevel = tanklevel_check(Tankhight); // Check tank level
   String Hours = HourStatus();  
@@ -393,9 +398,36 @@ void loop()
     send_Message(tanklevel, "Waterpump/Waterlevel");
   }
 
+
+  if (touchDetected1) {
+    Serial.println("Manual Touch Detected: Pump Activated");
+
+    digitalWrite(Pump, HIGH);
+    
+    while (true) {
+        String tanklevel = tanklevel_check(Tankhight); // Continuously update tank level
+        Serial.println("Checking Tank Level...");
+
+        if (tanklevel == "HIGH") {
+            Serial.println("Tank is FULL. Turning off Pump.");
+            break;  // Exit loop when tank is full
+        }
+
+        delay(1000); 
+    }
+
+    digitalWrite(Pump, LOW);
+    Serial.println("Water PUMP is OFF | Tank level HIGH");
+    touchDetected1 = false;  // Reset flag
+}
+
+else{
+
+
   // Handle tank level conditions
   if (tanklevel == "LOW")
   {
+   
     if ((Hours == "REGULAR" || Hours == "OFF-PEAK") && tds > 8.00 && tds <= 12.00)
     {
       digitalWrite(Pump, HIGH);
@@ -433,6 +465,6 @@ void loop()
     digitalWrite(filtervalve, LOW);
     Serial.println("Water PUMP & Filter valve OFF | (Tank level HIGH)");
   }
-
-  delay(2000); // 2-second delay to stabilize loop
+}
+ delay(2000); // 2-second delay to stabilize loop
 }
