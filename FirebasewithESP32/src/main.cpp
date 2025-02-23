@@ -102,20 +102,76 @@ void send_Message(String message, String databasePath) {
   }
 }
 
-String readString(String path) {
-  String receivedString = ""; // Initialize an empty string to hold the result
-  // Read data from the Firebase path
-  if (Firebase.RTDB.getString(&fbdo, path)) {
-    if (fbdo.dataType() == "string") {
-      receivedString = fbdo.stringData();
-      Serial.println("Received string data: " + receivedString);
-    } else {
-      Serial.println("Data is not a string!");
+
+String readString(String path)
+{
+    String receivedString = ""; // Initialize an empty string to hold the result
+    // Read data from the Firebase path
+    if (Firebase.RTDB.getString(&fbdo, path))
+    {
+        if (fbdo.dataType() == "string")
+        {
+            receivedString = fbdo.stringData();
+            Serial.println("Received string data: " + receivedString);
+        }
+        else
+        {
+            Serial.println("Data is not a string!");
+        }
     }
-  } else {
-    Serial.println("Failed to read string data. Reason: " + fbdo.errorReason());
-  }
-  return receivedString; // Return the string data
+    else
+    {
+        Serial.println("Failed to read string data. Reason: " + fbdo.errorReason());
+    }
+    return receivedString; // Return the string data
+}
+float readFloat(String path)
+{
+    float receivedFloat = 0.0; // Default value if reading fails
+
+    // Read data from the Firebase path
+    if (Firebase.RTDB.getFloat(&fbdo, path))
+    {
+        if (fbdo.dataType() == "float")
+        {
+            receivedFloat = fbdo.floatData();
+            Serial.println("Received float data: " + String(receivedFloat, 2)); // Print with 2 decimal places
+        }
+        else
+        {
+            Serial.println("Data is not a float!");
+        }
+    }
+    else
+    {
+        Serial.println("Failed to read float data. Reason: " + fbdo.errorReason());
+    }
+    
+    return receivedFloat; // Return the float data
+}
+int readInt(String path)
+{
+    int receivedInt = 0; // Default value if reading fails
+
+    // Read data from the Firebase path
+    if (Firebase.RTDB.getInt(&fbdo, path))
+    {
+        if (fbdo.dataType() == "int")
+        {
+            receivedInt = fbdo.intData();
+            Serial.println("Received integer data: " + String(receivedInt));
+        }
+        else
+        {
+            Serial.println("Data is not an integer!");
+        }
+    }
+    else
+    {
+        Serial.println("Failed to read integer data. Reason: " + fbdo.errorReason());
+    }
+    
+    return receivedInt; // Return the integer data
 }
 
 
